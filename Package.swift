@@ -10,8 +10,8 @@ let package = Package(
         .executable(name: "PotatoAB", targets: ["PotatoAB"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.10.0"),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "0.1.0")
+        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.24.0"),
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "2.30.0")
     ],
     targets: [
         .executableTarget(

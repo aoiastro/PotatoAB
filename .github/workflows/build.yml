@@ -1,0 +1,46 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set Default Scheme
+      run: |
+        echo "SCHEME=PotatoAB" >> $GITHUB_ENV
+
+    - name: Build
+      env:
+        scheme: ${{ env.SCHEME }}
+      run: |
+        # Build without signing
+        xcodebuild archive \
+          -scheme $scheme \
+          -destination 'generic/platform=iOS' \
+          -archivePath $PWD/build/$scheme.xcarchive \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_ALLOWED=NO \
+          COMPILER_INDEX_STORE_ENABLE=NO \
+          | xcpretty
+        
+    - name: Create Unsigned IPA
+      run: |
+        mkdir -p Payload
+        cp -r build/${{ env.SCHEME }}.xcarchive/Products/Applications/${{ env.SCHEME }}.app Payload/
+        zip -qr PotatoAB_unsigned.ipa Payload
+
+    - name: Upload IPA
+      uses: actions/upload-artifact@v4
+      with:
+        name: PotatoAB_unsigned
+        path: PotatoAB_unsigned.ipa

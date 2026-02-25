@@ -18,6 +18,7 @@ class SpeechManager: ObservableObject {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
+    private var completionTask: Task<Void, Never>?
     
     var onCommandDetected: ((String) -> Void)?
     
@@ -126,15 +127,20 @@ class SpeechManager: ObservableObject {
             print("Listening: \(text)")
             
             // To implement silence detection manually:
-            NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(commandFinished), object: nil)
-            perform(#selector(commandFinished), with: nil, afterDelay: 2.0)
+            completionTask?.cancel()
+            completionTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                if !Task.isCancelled {
+                    self.commandFinished()
+                }
+            }
             
         case .processing:
             break
         }
     }
     
-    @objc private func commandFinished() {
+    private func commandFinished() {
         guard state == .listeningToCommand, !recognizedText.isEmpty else { return }
         print("Command Finished: \(recognizedText)")
         state = .processing

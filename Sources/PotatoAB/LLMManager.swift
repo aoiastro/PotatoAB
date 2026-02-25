@@ -3,6 +3,7 @@ import SwiftUI
 import MLX
 import MLXRandom
 import MLXLLM
+import MLXLMCommon
 
 @MainActor
 @Observable
@@ -13,41 +14,12 @@ class LLMManager {
     var isGenerating = false
     
     // MLX objects
-    private var modelConfiguration = ModelConfiguration.qwen2_5_1_5b_instruct_4bit // Closest available to Qwen3 1.7B 4bit in examples
-    private var llmModel: LLMModel?
+    private var modelConfiguration = ModelConfiguration(
+        id: "mlx-community/Qwen3-1.7B-4bit"
+    )
+    private var session: ChatSession?
     
     init() {
-        // We override the model string to the Hugging Face repo specifically requested by the user, if available.
-        // Qwen3 1.7B doesn't officially exist yet (as of early 2024 knowledge), but the user gave: mlx-community/Qwen3-1.7B-4bit
-        // Oh actually there is Qwen2.5! We will configure a custom ModelConfiguration to load exactly the repo.
-        self.modelConfiguration = ModelConfiguration(
-            id: "mlx-community/Qwen3-1.7B-4bit",
-            name: "Qwen3",
-            tokenizerId: "mlx-community/Qwen3-1.7B-4bit"
-        )
-    }
-    
-    func loadModel() async {
-        guard !isModelLoaded else { return }
-        isDownloading = true
-        
-        do {
-            // MLXLLM has a load mechanism that reports progress.
-            let modelContainer = try await LLMModelFactory.shared.loadContainer(
-                configuration: modelConfiguration
-            ) { progress in
-                Task { @MainActor in
-                    self.downloadProgress = progress.fractionCompleted
-                }
-            }
-            
-            self.llmModel = modelContainer
-            self.isModelLoaded = true
-            self.isDownloading = false
-        } catch {
-            print("Failed to load MLX model: \(error)")
-            self.isDownloading = false
-        }
     }
     
     // System prompt forces the model to reply in a strict JSON format matching App needs.
@@ -65,6 +37,33 @@ class LLMManager {
     }
     """
     
+    func loadModel() async {
+        guard !isModelLoaded else { return }
+        isDownloading = true
+        
+        do {
+            // MLXLLM has a load mechanism that reports progress.
+            let modelContainer = try await LLMModelFactory.shared.loadContainer(
+                configuration: modelConfiguration
+            ) { progress in
+                Task { @MainActor in
+                    self.downloadProgress = progress.fractionCompleted
+                }
+            }
+            
+            self.session = ChatSession(
+                modelContainer,
+                instructions: systemPrompt,
+                generateParameters: GenerateParameters(temperature: 0.6)
+            )
+            self.isModelLoaded = true
+            self.isDownloading = false
+        } catch {
+            print("Failed to load MLX model: \(error)")
+            self.isDownloading = false
+        }
+    }
+    
     struct JSONOutput: Codable {
         let speech: String
         let expression: String
@@ -72,28 +71,13 @@ class LLMManager {
     
     // Runs the LLM synchronously (but wrapped in Swift Concurrency so it doesn't block main)
     func generate(prompt: String) async -> JSONOutput? {
-        guard isModelLoaded, let llm = self.llmModel else { return nil }
+        guard isModelLoaded, let session = self.session else { return nil }
         
         isGenerating = true
         defer { isGenerating = false }
         
-        let messages: [[String: String]] = [
-            ["role": "system", "content": systemPrompt],
-            ["role": "user", "content": prompt]
-        ]
-        
         do {
-            // Apply chat template from the tokenizer configuration.
-            let fullPrompt = try await llm.render(messages: messages)
-            
-            // Configuration for generation parameters
-            let generateParams = GenerateParameters(temperature: 0.6)
-            
-            // Generate locally via MLX
-            let result = try await llm.generate(prompt: fullPrompt, parameters: generateParams)
-            
-            // Try extracting the JSON block from result.output
-            let text = result.output
+            let text = try await session.respond(to: prompt)
             print("Raw LLM text: \(text)")
             
             if let parsed = parseJSON(from: text) {

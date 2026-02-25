@@ -23,9 +23,6 @@ let package = Package(
                 .product(name: "MLXOptimizers", package: "mlx-swift"),
                 .product(name: "MLXFFT", package: "mlx-swift"),
                 .product(name: "MLXLLM", package: "mlx-swift-examples")
-            ],
-            resources: [
-                .process("Info.plist")
             ]
         )
     ]

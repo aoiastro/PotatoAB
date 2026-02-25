@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
     - uses: actions/checkout@v4
@@ -37,6 +37,13 @@ jobs:
       run: |
         mkdir -p Payload
         cp -r build/${{ env.SCHEME }}.xcarchive/Products/Applications/${{ env.SCHEME }}.app Payload/
+        PLIST="Payload/${{ env.SCHEME }}.app/Info.plist"
+        /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'PotatoABはあなたが話しかけた言葉を認識するためにマイクを使用します。'" $PLIST || true
+        /usr/libexec/PlistBuddy -c "Add :NSSpeechRecognitionUsageDescription string 'PotatoABはあなたの声を聞き取り、返答するために音声認識を使用します。'" $PLIST || true
+        /usr/libexec/PlistBuddy -c "Delete :UISupportedInterfaceOrientations" $PLIST || true
+        /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations array" $PLIST || true
+        /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string 'UIInterfaceOrientationLandscapeLeft'" $PLIST || true
+        /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:1 string 'UIInterfaceOrientationLandscapeRight'" $PLIST || true
         zip -qr PotatoAB_unsigned.ipa Payload
 
     - name: Upload IPA

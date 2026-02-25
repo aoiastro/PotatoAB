@@ -13,11 +13,16 @@ class TTSManager: NSObject, AVSpeechSynthesizerDelegate, ObservableObject {
         super.init()
         synthesizer.delegate = self
         
+        setupAudioSession()
+    }
+    
+    private func setupAudioSession() {
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
-            try AVAudioSession.sharedInstance().setActive(true)
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            print("Failed to setup audio session: \(error)")
+            print("TTSManager: Failed to setup audio session: \(error)")
         }
     }
     

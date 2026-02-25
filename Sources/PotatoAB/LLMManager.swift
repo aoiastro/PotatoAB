@@ -37,38 +37,36 @@ class LLMManager {
     }
     """
     
-    func loadModel() {
+    func loadModel() async {
         guard !isModelLoaded else { return }
         isDownloading = true
         
-        Task.detached {
-            do {
-                // MLXLLM has a load mechanism that reports progress.
-                let modelContainer = try await LLMModelFactory.shared.loadContainer(
+        do {
+            // We use Task.detached for the actual heavy work of loading and allocating tensors
+            // to ensure it never blocks the system's MainActor.
+            let container = try await Task.detached(priority: .userInitiated) {
+                try await LLMModelFactory.shared.loadContainer(
                     configuration: await self.modelConfiguration
                 ) { progress in
                     Task { @MainActor in
                         self.downloadProgress = progress.fractionCompleted
                     }
                 }
-                
-                let session = ChatSession(
-                    modelContainer,
-                    instructions: await self.systemPrompt,
-                    generateParameters: GenerateParameters(temperature: 0.6)
-                )
-                
-                await MainActor.run {
-                    self.session = session
-                    self.isModelLoaded = true
-                    self.isDownloading = false
-                }
-            } catch {
-                print("Failed to load MLX model: \(error)")
-                await MainActor.run {
-                    self.isDownloading = false
-                }
-            }
+            }.value
+            
+            // Session creation is light but we store it.
+            let session = ChatSession(
+                container,
+                instructions: systemPrompt,
+                generateParameters: GenerateParameters(temperature: 0.6)
+            )
+            
+            self.session = session
+            self.isModelLoaded = true
+            self.isDownloading = false
+        } catch {
+            print("Failed to load MLX model: \(error)")
+            self.isDownloading = false
         }
     }
     

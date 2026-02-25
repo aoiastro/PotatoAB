@@ -48,7 +48,13 @@ class SpeechManager: ObservableObject {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
+            
+            // Activate session with a small buffer and error check
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("SpeechManager: Failed to setup/activate AVAudioSession: \(error)")
+            return
+        }
             
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             guard let recognitionRequest = recognitionRequest else { return }

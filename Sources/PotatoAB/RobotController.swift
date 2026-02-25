@@ -77,10 +77,15 @@ class RobotController: ObservableObject {
         }
         
         statusText = "AIモデルを読み込み中..."
-        llmManager.loadModel()
+        await llmManager.loadModel()
         
-        statusText = "準備完了"
-        speechManager.startListening()
+        if llmManager.isModelLoaded {
+            statusText = "準備完了"
+            speechManager.startListening()
+        } else {
+            statusText = "モデルの読み込みに失敗しました"
+            expression = .sad
+        }
     }
     
     private func processCommand(_ command: String) {

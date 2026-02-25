@@ -37,8 +37,8 @@ jobs:
       run: |
         mkdir -p Payload/${{ env.SCHEME }}.app
         
-        # SwiftPM outputs a bare executable to /usr/local/bin inside the archive
-        cp build/${{ env.SCHEME }}.xcarchive/Products/usr/local/bin/${{ env.SCHEME }} Payload/${{ env.SCHEME }}.app/
+        # SwiftPM outputs a bare executable and its resource bundles to /usr/local/bin inside the archive
+        cp -R build/${{ env.SCHEME }}.xcarchive/Products/usr/local/bin/* Payload/${{ env.SCHEME }}.app/
         
         PLIST="Payload/${{ env.SCHEME }}.app/Info.plist"
         
@@ -75,7 +75,7 @@ jobs:
         /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:1 string 'UIInterfaceOrientationLandscapeRight'" $PLIST || true
         
         # Apply pseudo-signing with our entitlements to stop Jetsam from killing the MLX Model
-        codesign -f -s - --entitlements PotatoAB.entitlements Payload/${{ env.SCHEME }}.app
+        codesign -f -s - --deep --entitlements PotatoAB.entitlements Payload/${{ env.SCHEME }}.app
         
         zip -qr PotatoAB_unsigned.ipa Payload
 

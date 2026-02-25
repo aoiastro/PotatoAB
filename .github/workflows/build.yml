@@ -74,6 +74,9 @@ jobs:
         /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string 'UIInterfaceOrientationLandscapeLeft'" $PLIST || true
         /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:1 string 'UIInterfaceOrientationLandscapeRight'" $PLIST || true
         
+        # Apply pseudo-signing with our entitlements to stop Jetsam from killing the MLX Model
+        codesign -f -s - --entitlements PotatoAB.entitlements Payload/${{ env.SCHEME }}.app
+        
         zip -qr PotatoAB_unsigned.ipa Payload
 
     - name: Upload IPA

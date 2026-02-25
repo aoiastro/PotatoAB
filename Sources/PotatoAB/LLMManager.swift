@@ -15,7 +15,7 @@ class LLMManager {
     
     // MLX objects
     private var modelConfiguration = ModelConfiguration(
-        id: "mlx-community/Qwen3-1.7B-4bit"
+        id: "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
     )
     private var session: ChatSession?
     
@@ -37,30 +37,38 @@ class LLMManager {
     }
     """
     
-    func loadModel() async {
+    func loadModel() {
         guard !isModelLoaded else { return }
         isDownloading = true
         
-        do {
-            // MLXLLM has a load mechanism that reports progress.
-            let modelContainer = try await LLMModelFactory.shared.loadContainer(
-                configuration: modelConfiguration
-            ) { progress in
-                Task { @MainActor in
-                    self.downloadProgress = progress.fractionCompleted
+        Task.detached {
+            do {
+                // MLXLLM has a load mechanism that reports progress.
+                let modelContainer = try await LLMModelFactory.shared.loadContainer(
+                    configuration: await self.modelConfiguration
+                ) { progress in
+                    Task { @MainActor in
+                        self.downloadProgress = progress.fractionCompleted
+                    }
+                }
+                
+                let session = ChatSession(
+                    modelContainer,
+                    instructions: await self.systemPrompt,
+                    generateParameters: GenerateParameters(temperature: 0.6)
+                )
+                
+                await MainActor.run {
+                    self.session = session
+                    self.isModelLoaded = true
+                    self.isDownloading = false
+                }
+            } catch {
+                print("Failed to load MLX model: \(error)")
+                await MainActor.run {
+                    self.isDownloading = false
                 }
             }
-            
-            self.session = ChatSession(
-                modelContainer,
-                instructions: systemPrompt,
-                generateParameters: GenerateParameters(temperature: 0.6)
-            )
-            self.isModelLoaded = true
-            self.isDownloading = false
-        } catch {
-            print("Failed to load MLX model: \(error)")
-            self.isDownloading = false
         }
     }
     

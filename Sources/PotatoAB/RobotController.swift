@@ -77,7 +77,7 @@ class RobotController: ObservableObject {
         }
         
         statusText = "AIモデルを読み込み中..."
-        await llmManager.loadModel()
+        llmManager.loadModel()
         
         statusText = "準備完了"
         speechManager.startListening()

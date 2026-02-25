@@ -47,7 +47,7 @@ class SpeechManager: ObservableObject {
         
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
             
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
@@ -58,6 +58,9 @@ class SpeechManager: ObservableObject {
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
             
+            // Remove tap if exists to prevent crash
+            inputNode.removeTap(onBus: 0)
+            
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, when in
                 recognitionRequest.append(buffer)
             }
@@ -67,19 +70,23 @@ class SpeechManager: ObservableObject {
             
             state = .waitingForWakeWord
             
-            recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { result, error in
-                if let result = result {
-                    let text = result.bestTranscription.formattedString
-                    Task { @MainActor in
+            recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+                guard let self = self else { return }
+                
+                Task { @MainActor in
+                    if let result = result {
+                        let text = result.bestTranscription.formattedString
                         self.handleTranscriptionUpdate(text)
                     }
-                }
-                
-                if error != nil || (result?.isFinal ?? false) {
-                    self.stopAudioEngine()
-                    // Auto restart if waiting for wake word and it closed
-                    if self.state == .waitingForWakeWord {
-                        self.startListening()
+                    
+                    if error != nil || (result?.isFinal ?? false) {
+                        self.stopAudioEngine()
+                        
+                        // Prevent instant infinite loops bounds
+                        if self.state == .waitingForWakeWord {
+                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                            self.startListening()
+                        }
                     }
                 }
             }

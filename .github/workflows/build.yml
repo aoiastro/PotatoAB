@@ -35,15 +35,45 @@ jobs:
         
     - name: Create Unsigned IPA
       run: |
-        mkdir -p Payload
-        cp -r build/${{ env.SCHEME }}.xcarchive/Products/Applications/${{ env.SCHEME }}.app Payload/
+        mkdir -p Payload/${{ env.SCHEME }}.app
+        
+        # SwiftPM outputs a bare executable to /usr/local/bin inside the archive
+        cp build/${{ env.SCHEME }}.xcarchive/Products/usr/local/bin/${{ env.SCHEME }} Payload/${{ env.SCHEME }}.app/
+        
         PLIST="Payload/${{ env.SCHEME }}.app/Info.plist"
+        
+        # Create a base Info.plist
+        cat <<EOF > "$PLIST"
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>${{ env.SCHEME }}</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.potato.${{ env.SCHEME }}</string>
+            <key>CFBundleName</key>
+            <string>${{ env.SCHEME }}</string>
+            <key>CFBundleVersion</key>
+            <string>1.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>LSRequiresIPhoneOS</key>
+            <true/>
+            <key>UILaunchStoryboardName</key>
+            <string>LaunchScreen</string>
+        </dict>
+        </plist>
+        EOF
+        
         /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'PotatoABはあなたが話しかけた言葉を認識するためにマイクを使用します。'" $PLIST || true
         /usr/libexec/PlistBuddy -c "Add :NSSpeechRecognitionUsageDescription string 'PotatoABはあなたの声を聞き取り、返答するために音声認識を使用します。'" $PLIST || true
-        /usr/libexec/PlistBuddy -c "Delete :UISupportedInterfaceOrientations" $PLIST || true
         /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations array" $PLIST || true
         /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string 'UIInterfaceOrientationLandscapeLeft'" $PLIST || true
         /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:1 string 'UIInterfaceOrientationLandscapeRight'" $PLIST || true
+        
         zip -qr PotatoAB_unsigned.ipa Payload
 
     - name: Upload IPA
